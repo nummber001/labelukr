@@ -2,15 +2,14 @@
     'use strict';
 
     const plugin = {
-        name: 'UkrLabelAuto',
+        name: 'UkrLabelWorking',
         version: '1.0',
         author: 'ChatGPT',
         init: function () {
             this.addCSS();
-            this.observePosters();
+            this.overrideRenderer();
         },
 
-        // Додаємо CSS для мітки
         addCSS: function () {
             const style = document.createElement('style');
             style.textContent = `
@@ -34,78 +33,46 @@
             document.head.appendChild(style);
         },
 
-        // Скануємо і додаємо мітки автоматично
-        observePosters: function () {
-            const self = this;
+        overrideRenderer: function () {
+            // Перевизначаємо метод рендеру постера
+            const original = Lampa.ControllerPoster.renderPoster;
 
-            // Функція для додавання мітки
-            function addLabel(poster, filmData) {
-                if (!poster || !filmData) return;
-                if (poster.querySelector('.ukr-label')) return;
+            Lampa.ControllerPoster.renderPoster = function(poster, film) {
+                const el = original.apply(this, arguments);
 
-                // Перевірка на українську доріжку
-                const hasUkr = (filmData.audio && filmData.audio.includes('uk')) ||
-                               (filmData.language && filmData.language.includes('uk')) ||
-                               (filmData.subtitles && filmData.subtitles.includes('uk'));
+                if (film) {
+                    const hasUkr = (film.audio && film.audio.includes('uk')) ||
+                                   (film.subtitles && film.subtitles.includes('uk')) ||
+                                   (film.language && film.language.includes('uk'));
 
-                if (!hasUkr) return;
+                    if (hasUkr) {
+                        // Обгортка постера
+                        if (!el.parentNode.classList.contains('ukr-wrapper')) {
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'ukr-wrapper';
+                            el.parentNode.insertBefore(wrapper, el);
+                            wrapper.appendChild(el);
+                        }
 
-                // Обгортка постера для позиціонування
-                if (!poster.parentNode.classList.contains('ukr-wrapper')) {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'ukr-wrapper';
-                    poster.parentNode.insertBefore(wrapper, poster);
-                    wrapper.appendChild(poster);
-                }
-
-                const label = document.createElement('div');
-                label.className = 'ukr-label';
-                label.textContent = 'UA';
-                poster.parentNode.appendChild(label);
-            }
-
-            // Використовуємо MutationObserver для всіх нових постерів
-            const observer = new MutationObserver(mutations => {
-                mutations.forEach(mutation => {
-                    mutation.addedNodes.forEach(node => {
-                        if (!(node instanceof HTMLElement)) return;
-
-                        // Шукаємо всі постери у новому елементі
-                        const posters = node.querySelectorAll('img, .poster, .film-poster, .item-poster');
-                        posters.forEach(poster => {
-                            let filmData = poster.filmData || poster.dataset.film;
-
-                            if (filmData) {
-                                if (typeof filmData === 'string') {
-                                    try { filmData = JSON.parse(filmData); } catch (e) { return; }
-                                }
-                                addLabel(poster, filmData);
-                            }
-                        });
-                    });
-                });
-            });
-
-            observer.observe(document.body, { childList: true, subtree: true });
-
-            // Початкове сканування
-            const existingPosters = document.querySelectorAll('img, .poster, .film-poster, .item-poster');
-            existingPosters.forEach(poster => {
-                let filmData = poster.filmData || poster.dataset.film;
-                if (filmData) {
-                    if (typeof filmData === 'string') {
-                        try { filmData = JSON.parse(filmData); } catch (e) { return; }
+                        // Додаємо мітку
+                        if (!el.parentNode.querySelector('.ukr-label')) {
+                            const label = document.createElement('div');
+                            label.className = 'ukr-label';
+                            label.textContent = 'UA';
+                            el.parentNode.appendChild(label);
+                        }
                     }
-                    addLabel(poster, filmData);
                 }
-            });
+
+                return el;
+            };
         }
     };
 
-    // Реєстрація плагіна у Лампі
     if (window.Lampa && Lampa.plugins) {
         Lampa.plugins.register(plugin);
+        console.log('UkrLabelWorking плагін активований ✅');
     } else {
-        console.error('Lampa не знайдено. Плагін UkrLabelAuto не активований.');
+        console.error('Lampa не знайдено. Плагін UkrLabelWorking не активований.');
     }
 })();
