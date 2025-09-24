@@ -2,12 +2,12 @@
     'use strict';
 
     const plugin = {
-        name: 'UkrLabelWorking',
+        name: 'UkrLabelReliable',
         version: '1.0',
         author: 'ChatGPT',
         init: function () {
             this.addCSS();
-            this.overrideRenderer();
+            this.observePosters();
         },
 
         addCSS: function () {
@@ -33,46 +33,56 @@
             document.head.appendChild(style);
         },
 
-        overrideRenderer: function () {
-            // Перевизначаємо метод рендеру постера
-            const original = Lampa.ControllerPoster.renderPoster;
+        observePosters: function () {
+            const self = this;
 
-            Lampa.ControllerPoster.renderPoster = function(poster, film) {
-                const el = original.apply(this, arguments);
+            function addLabel(poster) {
+                if (!poster || poster.querySelector('.ukr-label')) return;
 
-                if (film) {
-                    const hasUkr = (film.audio && film.audio.includes('uk')) ||
-                                   (film.subtitles && film.subtitles.includes('uk')) ||
-                                   (film.language && film.language.includes('uk'));
+                // Беремо текстові атрибути, які часто містять info про доріжки
+                const textData = (poster.alt || poster.title || poster.dataset.title || '').toLowerCase();
 
-                    if (hasUkr) {
-                        // Обгортка постера
-                        if (!el.parentNode.classList.contains('ukr-wrapper')) {
-                            const wrapper = document.createElement('div');
-                            wrapper.className = 'ukr-wrapper';
-                            el.parentNode.insertBefore(wrapper, el);
-                            wrapper.appendChild(el);
-                        }
-
-                        // Додаємо мітку
-                        if (!el.parentNode.querySelector('.ukr-label')) {
-                            const label = document.createElement('div');
-                            label.className = 'ukr-label';
-                            label.textContent = 'UA';
-                            el.parentNode.appendChild(label);
-                        }
+                // Перевірка на українську
+                if (textData.includes('ukr') || textData.includes('ua') || textData.includes('українська')) {
+                    // Обгортка постера
+                    if (!poster.parentNode.classList.contains('ukr-wrapper')) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'ukr-wrapper';
+                        poster.parentNode.insertBefore(wrapper, poster);
+                        wrapper.appendChild(poster);
                     }
-                }
 
-                return el;
-            };
+                    const label = document.createElement('div');
+                    label.className = 'ukr-label';
+                    label.textContent = 'UA';
+                    poster.parentNode.appendChild(label);
+                }
+            }
+
+            // Використовуємо MutationObserver для динамічних постерів
+            const observer = new MutationObserver(mutations => {
+                mutations.forEach(mutation => {
+                    mutation.addedNodes.forEach(node => {
+                        if (!(node instanceof HTMLElement)) return;
+
+                        const posters = node.querySelectorAll('img, .poster, .film-poster, .item-poster');
+                        posters.forEach(poster => addLabel(poster));
+                    });
+                });
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            // Початкове сканування
+            const existingPosters = document.querySelectorAll('img, .poster, .film-poster, .item-poster');
+            existingPosters.forEach(poster => addLabel(poster));
         }
     };
 
     if (window.Lampa && Lampa.plugins) {
         Lampa.plugins.register(plugin);
-        console.log('UkrLabelWorking плагін активований ✅');
+        console.log('UkrLabelReliable плагін активований ✅');
     } else {
-        console.error('Lampa не знайдено. Плагін UkrLabelWorking не активований.');
+        console.error('Lampa не знайдено. Плагін UkrLabelReliable не активований.');
     }
 })();
